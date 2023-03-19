@@ -13,7 +13,7 @@
 
 import operator
 
-import mdp, util
+import util
 from learningAgents import ValueEstimationAgent
 
 class ValueIterationAgent(ValueEstimationAgent):
@@ -42,13 +42,15 @@ class ValueIterationAgent(ValueEstimationAgent):
         self.discount = discount
         self.iterations = iterations
         self.values = util.Counter()  # A Counter is a dict with default 0
-
         states = self.mdp.getStates()
         for _ in range(iterations):
+            new_values = self.values.copy()
             for state in states:
-                reward = self.mdp.getReward(None, None, state)
                 actions = self.mdp.getPossibleActions(state)
-                self.values[state] = reward + max([self.computeQValueFromValues(state, action) for action in actions])
+                if self.mdp.isTerminal(state):
+                    continue
+                new_values[state] = max([self.computeQValueFromValues(state, action) for action in actions])
+            self.values = new_values
 
     def getValue(self, state):
         """
@@ -60,9 +62,12 @@ class ValueIterationAgent(ValueEstimationAgent):
         """
           Compute the Q-value of action in state from the
           value function stored in self.values.
-        """
+        """                
         transition_states_and_probs = self.mdp.getTransitionStatesAndProbs(state, action)
-        q_value = sum([d[1]*self.discount*self.getValue(d[0]) for d in transition_states_and_probs])
+        q_value = 0
+        for next_state, prob in transition_states_and_probs:
+            reward = self.mdp.getReward(state, None, None)
+            q_value += prob * (reward + self.discount * self.getValue(next_state))
         return q_value
 
     def computeActionFromValues(self, state):
@@ -74,8 +79,10 @@ class ValueIterationAgent(ValueEstimationAgent):
           there are no legal actions, which is the case at the
           terminal state, you should return None.
         """
+
         actions = self.mdp.getPossibleActions(state)
         q_values_and_actions = [(action, self.computeQValueFromValues(state, action)) for action in actions]
+        
         try: 
             best_action = max(q_values_and_actions, key=operator.itemgetter(1))[0]
         except ValueError:
